@@ -3,6 +3,8 @@ const BodyParser = require('body-parser')
 const { exec, execSync } = require('child_process');
 const Crypto = require('crypto');
 
+console.log('test')
+
 const APP = Express();
 APP.use(BodyParser.json());
 APP.use((req, res, next) => {
