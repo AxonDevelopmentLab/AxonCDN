@@ -5,8 +5,6 @@ const Crypto = require('crypto');
 const FS = require('fs');
 const Path = require('path');
 
-console.log('teste')
-
 const APP = Express();
 APP.use(BodyParser.json());
 APP.use((req, res, next) => {
