@@ -5,6 +5,8 @@ const Crypto = require('crypto');
 const FS = require('fs');
 const Path = require('path');
 
+let TotalRequests = 0;
+
 const APP = Express();
 APP.use(BodyParser.json());
 APP.use((req, res, next) => {
@@ -39,8 +41,8 @@ for (const Content of DeliveryContentFolder) {
 
 for (const ContentPath of DeliveryContentSubfolders) {
   const HttpPath = ContentPath.replace('delivery_content/', '');
-  APP.get(`/${HttpPath}`, (req, res) => res.sendFile(Path.resolve(ContentPath)));
+  APP.get(`/${HttpPath}`, (req, res) => { TotalRequests++; res.sendFile(Path.resolve(ContentPath)) });
 };
 
-APP.get('/', (req, res) => { res.status(200).json({ status: 200 }); });
+APP.get('/', (req, res) => { res.status(200).json({ status: 200, totalRequests: TotalRequests }); });
 const ExpressServer = APP.listen(8080, () => console.log(`AxonCDN status sucessfully started.`));
