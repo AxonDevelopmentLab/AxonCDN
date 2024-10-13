@@ -2,6 +2,8 @@ const Express = require('express');
 const BodyParser = require('body-parser')
 const { exec, execSync } = require('child_process');
 const Crypto = require('crypto');
+const FS = require('fs');
+const Path = require('path');
 
 const APP = Express();
 APP.use(BodyParser.json());
@@ -29,6 +31,22 @@ APP.post('/git', (req, res) => {
   
   return res.sendStatus(200);
 });
+
+const DeliveryContentFolder = FS.readdirSync('delivery_content');
+let DeliveryContentSubfolders = [];
+
+for (const Content of DeliveryContentFolder) {
+  const FolderPath = Path.join('delivery_content', Content);
+  const FolderFiles = FS.readdirSync(FolderPath);
+  
+  const FilePaths = FolderFiles.map((file) => Path.join(FolderPath, file));
+  DeliveryContentSubfolders = DeliveryContentSubfolders.concat(FilePaths);
+};
+
+for (const ContentPath of DeliveryContentSubfolders) {
+  const HttpPath = ContentPath.replace('delivery_content/', '');
+  APP.get(`/${HttpPath}`, (req, res) => res.sendFile(Path.resolve(ContentPath)));
+};
 
 APP.get('/', (req, res) => { res.status(200).json({ status: 200 }); });
 const ExpressServer = APP.listen(8080, () => console.log(`AxonCDN status sucessfully started.`));
