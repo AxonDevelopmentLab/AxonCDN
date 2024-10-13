@@ -1,15 +1,18 @@
-const Express = require('express');
-const BodyParser = require('body-parser')
+const express = require('express');
+const bodyParser = require('body-parser')
 const { execSync } = require('child_process');
-const Crypto = require('crypto');
-const FS = require('fs');
-const Path = require('path');
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
+const app = express();
 
-let TotalRequests = 0;
+let cache = {
+  uptime: 1,
+  total: 0,
+  hour: 0
+};
 
-const APP = Express();
-APP.use(BodyParser.json());
-APP.use((req, res, next) => {
+app.use(bodyParser.json(), (req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
@@ -18,8 +21,37 @@ APP.use((req, res, next) => {
   next();
 });
 
-APP.post('/git', (req, res) => {
-  let hmac = Crypto.createHmac("sha1", process.env.SECRET);
+const DeliveryContentFolder = fs.readdirSync('delivery_content');
+let DeliveryContentSubfolders = [];
+
+for (const Content of DeliveryContentFolder) {
+  const FolderPath = path.join('delivery_content', Content);
+  const FolderFiles = fs.readdirSync(FolderPath);
+  
+  const FilePaths = FolderFiles.map((file) => path.join(FolderPath, file));
+  DeliveryContentSubfolders = DeliveryContentSubfolders.concat(FilePaths);
+};
+
+for (const ContentPath of DeliveryContentSubfolders) {
+  const HttpPath = ContentPath.replace('delivery_content/', '');
+  app.get(`/${HttpPath}`, (req, res) => { cache.total++; cache.hour++; res.sendFile(path.resolve(ContentPath)) });
+};
+
+app.get('/', (req, res) => {
+  cache.total++;
+  cache.hour++;
+  res.send({ status: 200, requests: {
+    total: cache.total,
+    last_hour: cache.hour,
+    statistics: {
+      average_per_hour: Number(cache.total / cache.uptime).toFixed(2),
+      ratelimit: `${cache.hour}/4000`
+    }
+  }})
+});
+
+app.post('/git', (req, res) => {
+  let hmac = crypto.createHmac("sha1", process.env.SECRET);
   let sig  = "sha1=" + hmac.update(JSON.stringify(req.body)).digest("hex");
   if (req.headers['x-github-event'] == "push" && sig == req.headers['x-hub-signature']) {
     execSync('chmod 777 ./git.sh'); 
@@ -30,21 +62,5 @@ APP.post('/git', (req, res) => {
   return res.sendStatus(200);
 });
 
-const DeliveryContentFolder = FS.readdirSync('delivery_content');
-let DeliveryContentSubfolders = [];
-
-for (const Content of DeliveryContentFolder) {
-  const FolderPath = Path.join('delivery_content', Content);
-  const FolderFiles = FS.readdirSync(FolderPath);
-  
-  const FilePaths = FolderFiles.map((file) => Path.join(FolderPath, file));
-  DeliveryContentSubfolders = DeliveryContentSubfolders.concat(FilePaths);
-};
-
-for (const ContentPath of DeliveryContentSubfolders) {
-  const HttpPath = ContentPath.replace('delivery_content/', '');
-  APP.get(`/${HttpPath}`, (req, res) => { TotalRequests++; res.sendFile(Path.resolve(ContentPath)) });
-};
-
-APP.get('/', (req, res) => { res.status(200).json({ status: 200, totalRequests: TotalRequests }); });
-const ExpressServer = APP.listen(8080, () => console.log(`AxonCDN status sucessfully started.`));
+const expressServer = app.listen(8080, () => console.log(`AxonCDN status sucessfully started.`));
+setInterval(() => { cache.uptime++; cache.hour = 0; }, 1000 * 60 * 60);
