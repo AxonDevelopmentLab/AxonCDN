@@ -1,0 +1,1 @@
+delivery_content/files/InstalockAPP-Installer.exe filter=lfs diff=lfs merge=lfs -text
